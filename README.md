@@ -143,7 +143,7 @@ Routing section:
       return (
           <>
           <h1>Home page</h1>
-          <Link href="/blog">
+          <Link href="/blog" replace>
               <a>Blog</a>
           </Link>
           </>
@@ -152,4 +152,241 @@ Routing section:
 
       export default Home;
   ```
+
+- Programmatically navigation
+
+  - If we have a ecommere or a submit button , we can navigate programmatically
+
+  ```
+  import { useRouter } from "next/router";
+
+  const Home = () => {
+    const router = useRouter();
+
+    const handleClick = () => {
+      console.log("Placing your order");
+      router.push("/product");
+      //router.replace("/product/1");
+    };
+  }
+  ```
+
+- Define a custom 404
+
+  - if you nevigate to a url that doesnt exist then nextjs will render a 404
+  - We can customize the 404 page
+  - create a 404.js
+
+- Pre - rendering
+
+  - What is pre rendering and why
+  - Types of pre-rendering
+    - static generation
+      - without data
+      - with data
+      - Incremental static generation
+      - dYNAMIC PARAMETERS WHEN FETCHING DATA
+    - Server side rendering
+      - data fetching
+    - Client-side data fetching
+    - COmbining pre rendering with client side data fetching
+
+- Pre rendering
+
+  - comparing react app and next app
+  - react demo
+    - if we inspect the element we are going to see <div id="root"><img src=""><a>...</a></div>
+    - but when we check the view source code then the page loads <div id="root"></div> we only see this tag
+    - the information that is sent from the server is empty and it doesnt contain any data
+  - next js demo
+    - we can see the same tags that are seen through inspect and view source code
+
+  Next js pre-renders every page in the app
+
+  - pre-render : generate html for each page in advance instead of having it all done by client side javascript
+
+  No pre-rendenring
+
+  - initial load app is not rendered --- js loads ---> Hydration: React components are intialized and app becomes interactive
+
+  Pre rendenring
+
+  - pre rendered htmls is displayed --- js loads --> Hydration: React components are intialized and app becomes interactive
+
+  - render HTML in advance with the necessary data for a page
+
+Why pre-render?
+
+- improves performance
+
+  - in react app you need to wait for the javascript to be executed
+  - maybe fetch data form external api and then render UI
+  - there is a wait time for the user
+  - the html is already generated and loads faster
+
+- helps with SEO
+
+  - if you are building a ecommerce o blog it is very important to index the content
+  - with react app if the search enginer hits your page it only sees a div tag
+  - with a pre-render the content is present in the source code which will help index that page
+
+- How to pre-render?
+  Next js supports two forms of prerendering
+
+  - Static generation
+
+    - A method of prerendering where HTML pages are generated at build time
+    - The html wit all the data tat makes up the content of he we page are generated in advance whe you build your app
+    - Recommended method to pre-render pages whenever possible
+    - Can be built once , cached by CDN and served to the client almost instantly
+    - ex: blog ecommerce, marketing pages and coumentation
+
+    - How?
+
+      - Next js by default prerender every page in our app
+      - The HTML for every page will automatically be statically generated when build our app
+      - Prod server - An optimized build is create once and you deploy that build. You dont make code changes on the go once it is deployed
+        - in nextjs a page will be pre-rendered once when we run the build command
+      - Dev server - we should be able to make change in our code and we want that code to immediately reflect in the browser
+
+        - in next js the page is pre-rendered for every request you make
+
+      - We dont have to be worried about static generation in dev mode
+
+  - Static generation & data
+
+    - Without data
+
+      - build the app and generate html content - no need to fetch external data
+
+    - With data
+
+      - Pages that can only be generated after fetching external data at build time
+
+        - build the app for production
+        - fetches external data
+        - The html can only be generated after fetching data
+
+        ```
+          const Prerender = ({ users = [] }) => {
+            return (
+              <>
+                <h1>List of users</h1>
+                {users.map((user) => (
+                  <div key={user.id}>
+                    {user.name} - {user.email}
+                  </div>
+                ))}
+              </>
+            );
+          };
+          export default Prerender;
+
+          export async function getStaticProps() {
+            const response = await fetch("https://jsonplaceholder.typicode.com/users");
+            const users = await response.json();
+            console.log({ data });
+            return {
+              props: {
+                users,
+              },
+            };
+          }
+        ```
+
+      - getStaticProps
+        - pros
+          - we were able to fetch data and inject it to the page through props
+          - getStaticProps runs only on the server side
+          - The function will never run client side
+          - The code you write inside the getStaticProps wnt even be included in the JS bundle that is sent to the brwoser
+          - You can write server-side code directly in getStaticProps
+          - Accessing the file system usinf the fs module or querying a database cab be done inside getStaticProps
+          - You also dont have to be worry about including api keys
+        - cons
+          - it is allowed only in apage and cannot be run from a regular component file
+          - it is used only for prerendering and not client side data fetching
+          - should return an object and contain a props key
+          - get staticProps will run at build time
+
+  - server side rendering
+
+- Pages vs components
+
+  - we would like to create components so we need to create a separated folder called components
+
+- Inspecting static generation build
+  - we should build our app for prod
+    - run : npm run build
+    - to serve we need to run: npm run start
+- Link pre fetching
+
+  - When a page with getStaticProps is pre-rendered at build time , in addition to the page HTML file Next js generates a JSON file holding the result of running getstatticprops
+  - The JSON file will be used in client-side routing through next/link or next/router
+  - CLient -side page transitions will not call getStaticProps as only the exported JSON is used
+  - Any <Link /> component in the viewport will be prefetched by default (including the coressponding data) for pages using static generation this is why the load time is faster
+  - But if you navigate through url you wont have this ability
+
+- Summary Static generation
+
+  - is a method of prerendering where html pages are generated at build time
+  - with and without external data
+  - export getStaticProps function for external data
+  - HTML, Javascript and a JSON file are generated
+  - if you navifate directly yo the route, the html is served.
+  - If you navigate to the pae route from a different route, the page is created client side using the javascript and json prefetched from the server
+
+- Master detail pattern
+
+  - We have a master page and a details page that has the relevant details
+  - When click on articles then it will navigate to the article content
+  - we will have a dynamic parameter , so how we can mix static generation with a dynamic id
+  - dynamic parameters
+
+  ```
+    export async function getStaticProps(context) {
+      const { params } = context;
+      const url = `https://jsonplaceholder.typicode.com/posts/${params.postId}`;
+      const response = await fetch(url);
+      const post = await response.json();
+      console.log({ post, params, url });
+      return {
+        props: {
+          post,
+        },
+      };
+    }
+
+    export async function getStaticPaths() {
+      return {
+        paths: [
+          { params: { postId: "1" } },
+          { params: { postId: "2" } },
+          { params: { postId: "3" } },
+        ],
+        fallback: false,
+      };
+    }
+  ```
+
+  We would need to define every parameter in the getStaticPaths function
+
+  So with this the html will be loaded in advance at build time and when we navigate through the next/link or next/route it is going to be prefetched before going to the page
+
+  We can fetch the paths for getStatichPaths in order to avoid making individually
+
+  ```
+    export async function getStaticPaths() {
+      const url = `https://jsonplaceholder.typicode.com/posts`;
+      const response = await fetch(url);
+      const posts = await response.json();
+      const paths = posts.map((post) => ({ params: { postId: `${post.id}` } }));
+      return {
+        paths,
+        fallback: false,
+      };
+    }
+  ```
+
+  fallback key is mandatory accepts three possible values false, true and 'blocking'
   
