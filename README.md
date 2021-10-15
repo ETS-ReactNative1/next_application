@@ -6,14 +6,14 @@ React framework for production
 
 React apps:
 
-- Not quite possible to build a full feature rich ap ready to be deployed for prod
+- Not quite possible to build a full feature rich app ready to be deployed for prod
 - React is a library for building user interfaces
 - You have to make decisions on other features of the app like routing, styling, auth
 
 Next js
 
-- A packege taht uses react for building user interfaces
-- Loaded with a lot more feautres that enable you to buld full fledged prod ready app like routing, styling, auth
+- A package that uses react for building user interfaces
+- Loaded with a lot more feautures that enable you to build full fledged prod ready app like routing, styling, auth
 - react provides everything for you there's no need to install additional packages
 - conventions need to be followed
 
@@ -388,5 +388,126 @@ Why pre-render?
     }
   ```
 
-  fallback key is mandatory accepts three possible values false, true and 'blocking'
-  
+  fallback key is mandatory. It accepts three possible values false, true and 'blocking'
+
+  - Fallback is false
+
+    - paths returned from getStaticPaths will be rendered to html at build time by getStaticProps
+    - if fallback set to false, any apths not retuned by getStaticPaths will result in 404 page
+    - when?
+      - it is suitable if you if you have an app with a small number of paths to pre-render
+      - when new pages are not added often
+      - blog site with a few articles is a good example for fallback set to false
+
+  - Fallback is true
+
+    - paths returned from getStaticPaths will be rendered to html at build time by getStaticProps
+    - The paths that have not been generated at build time will not result in a 404 page, instead, next will serve a fallback version of the page on the first request to such a path.
+    - IN the back ground , next will statically generate the requested path HTML and JSON. thi includes running getStaticProps
+    - When that's done, the browser receives the json for the generated path. This will be used to automatically render the page with the required props. From the user's prespective, the page will be swapped from the fallback page to the full page.
+    - At the same time, next keeps track of the new list of pre-redenred pages. Subsequent requests to the same path will serve the generated page, just like other pages pre-redenred at build time
+
+    ```
+    import React from "react";
+    import { useRouter } from "next/router";
+
+    const Post = ({ post }) => {
+      const router = useRouter();
+      if (router.isFallback) {
+        return <h1>Loading...</h1>;
+      }
+      return (
+        <div>
+          <h1>
+            {post.id} {post.title}
+          </h1>
+          <p>{post.body}</p>
+        </div>
+      );
+    };
+
+    export default Post;
+
+    export async function getStaticProps(context) {
+      const { params } = context;
+      const url = `https://jsonplaceholder.typicode.com/posts/${params.postId}`;
+      const response = await fetch(url);
+      const post = await response.json();
+      if (!post.id) {
+        return {
+          notFound: true,
+        };
+      }
+      console.log("Generating page for postId: " + post.id);
+      return {
+        props: {
+          post,
+        },
+      };
+    }
+
+    export async function getStaticPaths() {
+      const url = `https://jsonplaceholder.typicode.com/posts`;
+      const response = await fetch(url);
+      const posts = await response.json();
+      // const paths = posts.map((post) => ({ params: { postId: `${post.id}` } }));
+      const paths = [
+        { params: { postId: "1" } },
+        { params: { postId: "2" } },
+        { params: { postId: "3" } },
+      ];
+      return {
+        paths,
+        fallback: true,
+      };
+    }
+    ```
+
+    - When?
+      - If our app has a very large number of static pages (ecommerce)
+      - You want all the product pages to be pre-rendered but if you ave a few thousand products, builds can take a long time
+      - You may statically generate a samll subset of products that are ppular and use fallback for the rest
+      - When someone request a page that's not generated yet the user will see the page with a loading indicator
+      - shortly after, getStaticProps finishes and the page will be rendered with the requested data. From then onwards, everyone who requests the same page willl get statically pre-rendered page
+
+- Fallback blocking
+
+  - It is very similar to true
+  - The difference is that we wont see any content when the page is generated
+  - paths returned from getStaticPaths will be rendered to html at build time by getStaticProps
+  - The paths that have not been generated at build time will not result in a 404 page. Instead, on the first request, next js will render oon the server and return the generated HTML
+  - When it is dne the browser receives the HTML for the generated path. From the user perspective it will transition from 'the browser is requesting the page' to 'the full page is laoded'. There is no flash of loading/fallback state.
+  - Keeps track of the new list of pre-rendered
+  - When ?
+    - UX level preople prefer to be loaded without a loading indicator
+    - Some crawlers did not suppor javascript. The loading page would be rendered and then te full page would be laded which was causing problem
+
+- Summary static generation SSG
+  - Pros
+    - SSG is a methos of pre-renderin where the HTML pages are generated at build time
+    - The pre-rendered static pages can be pushed to a CDN, cached and served to clients acrosss the globe almost instantly
+    - SSG is fast and better for SEO as they are immediately indexed by search engines
+    - SSG with getStaticProps for data fetching and getStaticPaths for dynamic pages seems like a really good approach to a wide variety of applications in production
+  - Cons
+    - The build time is proportional to the number of pages in the app
+    - A page, once generated, can contain stale data till the time you rebuild the app
+      - e comerce product prices can vary everyday
+      - the entire app has to be re built and the page with updated data will be statically generated
+      - What about getStaticPaths?
+        - pre render only few pages at build time and rest of the pages can be prerendered on request
+        - can we not use that to render say 10000 most popular pages and rest of the 99000 pages can be prerendered on request
+        - it still does not fix the issue of stale data
+        - If you render 1000 pages at build time, and then the rest are generated based on incoming request, using fallback true or blocking, changes in data will not update the already pre-rendered pages
+      - So with an exmaple if we change information from the API, the static pages cannot take the new changes because there were generated either at build time or on request. So the next time we request the same page, we wont have the new value.
+        For that reason there is a new concept called Incremental static regeneration. 
+
+
+- Incremental Static Generation (ISR)
+  - Allows you to update static pages after you have built your application
+  - You can statically generate indivicdual pages without needing to rebuild the entire site, effectively solving the issue of dealing with stale data
+
+  How? 
+    - In the getStaticProps function, apart from the props key, we can specify a revalidate key
+    - The value for revalidate is the number of seconds after which a page re-generation can occur
+    
+
