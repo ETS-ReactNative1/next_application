@@ -483,6 +483,7 @@ Why pre-render?
     - Some crawlers did not suppor javascript. The loading page would be rendered and then te full page would be laded which was causing problem
 
 - Summary static generation SSG
+
   - Pros
     - SSG is a methos of pre-renderin where the HTML pages are generated at build time
     - The pre-rendered static pages can be pushed to a CDN, cached and served to clients acrosss the globe almost instantly
@@ -499,74 +500,194 @@ Why pre-render?
         - it still does not fix the issue of stale data
         - If you render 1000 pages at build time, and then the rest are generated based on incoming request, using fallback true or blocking, changes in data will not update the already pre-rendered pages
       - So with an exmaple if we change information from the API, the static pages cannot take the new changes because there were generated either at build time or on request. So the next time we request the same page, we wont have the new value.
-        For that reason there is a new concept called Incremental static regeneration. 
-
+        For that reason there is a new concept called Incremental static regeneration.
 
 - Incremental Static Generation (ISR)
+
   - Allows you to update static pages after you have built your application
   - You can statically generate indivicdual pages without needing to rebuild the entire site, effectively solving the issue of dealing with stale data
 
-  How? 
-    - In the getStaticProps function, apart from the props key, we can specify a revalidate key
-    - The value for revalidate is the number of seconds after which a page re-generation can occur
+  How?
+
+  - In the getStaticProps function, apart from the props key, we can specify a revalidate key
+  - The value for revalidate is the number of seconds after which a page re-generation can occur
 
   What happen here?
-    - If we define the number of second for revalidating for example 30 seconds, then:
-      - The user make a request
-      - In the background the server is waiting for 30 seconds
-      - Within this time, we can modify information from the API
-      - Also, within this time, you can make a lot of requests and you will see the same data and the same cached page
-      - After 30 seconds, the server automatically invalid the current cached page and generate the new cached page. So, now the new cached page is available for the users
-  return {
-      - The user can request the same request and get a new cached page with new information
 
-      ```
+  - If we define the number of second for revalidating for example 30 seconds, then: - The user make a request - In the background the server is waiting for 30 seconds - Within this time, we can modify information from the API - Also, within this time, you can make a lot of requests and you will see the same data and the same cached page - After 30 seconds, the server automatically invalid the current cached page and generate the new cached page. So, now the new cached page is available for the users
+    return { - The user can request the same request and get a new cached page with new information
+
+        ```
+            import React from "react";
+            const Product = ({ product }) => {
+              return (
+                <div>
+                  <h1>
+                    {product.id} {product.title}
+                  </h1>
+                  <p>{product.price}</p>
+                </div>
+              );
+            };
+
+            export default Product;
+
+            export async function getStaticProps(context) {
+              const { params } = context;
+              console.log({ params });
+              const url = `http://localhost:4000/products/${params.productId}`;
+              const response = await fetch(url);
+              const product = await response.json();
+              if (!product.id) {
+                return {
+                  notFound: true,
+                };
+              }
+              console.log("Re - Generating page for productId: " + product.id);
+              return {
+                props: {
+                  product,
+                },
+                revalidate: 20,
+              };
+            }
+
+            export async function getStaticPaths() {
+              const paths = [{ params: { productId: "1" } }];
+              return {
+                paths,
+                fallback: "blocking",
+              };
+            }
+        ```
+
+- Sever side rendering (SSR)
+
+  - SSG
+
+    - HTML is statically generated at build time. The build page is then cached and resued for each request
+    - For a dynamic page with getStaticPaths and fallback set to true the page is not generated at build time but is generated on initial request
+    - With incremental static regeneration, a page can be regenerated for a request after the revalidation time has elapsed
+    - For the most part, the pages are generated using getStaticProps when you build the project
+    - We have some problems
+      - We cannot fetch data at request time, we run into the problem of stale data
+        - With a very dynamic website
+          - getStaticProps will fetch news at build time which is not suitable at all
+          - getStaticPaths will help fetch the data on the initial request but it is ten cached for subsequent requests
+          - ISR can help but if revalidate is 1 seconde, we still might not always see the most up to date news when regeneration is happening at background
+          - fetch data on the clide side but not good for SEO
+      - We dont get access to the incoming requests
+        - We cannot fetch for specific users and get the userId for cookies
+
+  - SSR
+
+    - HTML is generated for every incoming request
+    - It is required when you need to fetch data per request and also when you need to fetch personalized data keeping in min SEO
+    - How?
+
+      - We are building a website a list of articles
+      - getServerSideProps
+
+        - It runs only in the server side
+        - the function will never run client -side
+        - The code you write inside getServerSideProps wont even be included in the js bundle that is sent to the browser
+        - You can write server-sde code (fs, querying database can be done)
+        - You wont hve to worry about including API Keys
+        - is allowed only in a page and cannot be run from a regular component file
+        - this is only for prerendering and not client side data fetching
+        - getServersideProps run at request time
+
+        ```
           import React from "react";
-          const Product = ({ product }) => {
+
+          const NewsList = ({ articles }) => {
             return (
               <div>
-                <h1>
-                  {product.id} {product.title}
-                </h1>
-                <p>{product.price}</p>
+                <h1>List of new articles</h1>
+                {articles.map((article) => (
+                  <div key={article.id}>
+                    {article.title} | {article.category}
+                  </div>
+                ))}
               </div>
             );
           };
 
-          export default Product;
+          export default NewsList;
 
-          export async function getStaticProps(context) {
-            const { params } = context;
-            console.log({ params });
-            const url = `http://localhost:4000/products/${params.productId}`;
-            const response = await fetch(url);
-            const product = await response.json();
-            if (!product.id) {
-              return {
-                notFound: true,
-              };
-            }
-            console.log("Re - Generating page for productId: " + product.id);
+          export async function getServerSideProps() {
+            const response = await fetch("http://localhost:4000/news");
+            const articles = await response.json();
             return {
               props: {
-                product,
+                articles,
               },
-              revalidate: 20,
             };
           }
 
-          export async function getStaticPaths() {
-            const paths = [{ params: { productId: "1" } }];
-            return {
-              paths,
-              fallback: "blocking",
-            };
-          }
-      ```
+        ```
+
+  - Dynamic parameters
+
+    ```
+      import React from "react";
+
+      const Category = ({ articles, category }) => {
+        return (
+          <div>
+            <h1>Article list for {category}</h1>
+            {articles.map((article) => (
+              <div key={article.id}>
+                {article.title} | {article.category}
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      export default Category;
+
+      export async function getServerSideProps(context) {
+        const {
+          params: { category },
+        } = context;
+        const response = await fetch(
+          `http://localhost:4000/news?category=${category}`
+        );
+        const articles = await response.json();
+        return {
+          props: {
+            articles,
+            category,
+          },
+        };
+      }
+
+    ```
+
+  - Context
+
+    ```
+     export async function getServerSideProps(context) {
+      const {
+        params: { category },
+        req,
+        res,
+        query,
+      } = context;
+      console.log({ cookie: req.headers.cookie, query });
+      res.setHeader("Set-Cookie", ["name=Julian"]);
+      const response = await fetch(
+        `http://localhost:4000/news?category=${category}`
+      );
+      const articles = await response.json();
+      return {
+        props: {
+          articles,
+          category,
+        },
+      };
+    }
 
 
-
-
-      
-    
-
+    ```
