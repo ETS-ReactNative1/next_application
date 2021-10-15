@@ -509,5 +509,64 @@ Why pre-render?
   How? 
     - In the getStaticProps function, apart from the props key, we can specify a revalidate key
     - The value for revalidate is the number of seconds after which a page re-generation can occur
+
+  What happen here?
+    - If we define the number of second for revalidating for example 30 seconds, then:
+      - The user make a request
+      - In the background the server is waiting for 30 seconds
+      - Within this time, we can modify information from the API
+      - Also, within this time, you can make a lot of requests and you will see the same data and the same cached page
+      - After 30 seconds, the server automatically invalid the current cached page and generate the new cached page. So, now the new cached page is available for the users
+  return {
+      - The user can request the same request and get a new cached page with new information
+
+      ```
+          import React from "react";
+          const Product = ({ product }) => {
+            return (
+              <div>
+                <h1>
+                  {product.id} {product.title}
+                </h1>
+                <p>{product.price}</p>
+              </div>
+            );
+          };
+
+          export default Product;
+
+          export async function getStaticProps(context) {
+            const { params } = context;
+            console.log({ params });
+            const url = `http://localhost:4000/products/${params.productId}`;
+            const response = await fetch(url);
+            const product = await response.json();
+            if (!product.id) {
+              return {
+                notFound: true,
+              };
+            }
+            console.log("Re - Generating page for productId: " + product.id);
+            return {
+              props: {
+                product,
+              },
+              revalidate: 20,
+            };
+          }
+
+          export async function getStaticPaths() {
+            const paths = [{ params: { productId: "1" } }];
+            return {
+              paths,
+              fallback: "blocking",
+            };
+          }
+      ```
+
+
+
+
+      
     
 
