@@ -691,3 +691,400 @@ Why pre-render?
 
 
     ```
+
+- Client side data fetching
+
+  - You might not always need to pre render the data
+  - Example: User dashboard page
+  - No need to pre render data
+  - components prerender an initial state and fetching with useEffect and useState we can create some calls asynchrnously
+  - Example
+
+    ```
+    import React from "react";
+    import { useState, useEffect } from "react";
+
+    const Dashboard = () => {
+      const [isLoading, setisLoading] = useState(true);
+      const [dashboardData, setDashboardData] = useState(null);
+
+      useEffect(() => {
+        const fetchData = async () => {
+          const response = await fetch("http://localhost:4000/dashboard");
+          const data = await response.json();
+          setDashboardData(data);
+          setisLoading(false);
+        };
+        fetchData();
+      }, []);
+
+      return isLoading ? (
+        <h2>Loading...</h2>
+      ) : (
+        <div>
+          <h1>Dashboard</h1>
+          <h3>Posts - {dashboardData.posts}</h3>
+          <h3>Likes - {dashboardData.likes}</h3>
+          <h3>Followers - {dashboardData.followers}</h3>
+          <h3>Following - {dashboardData.following}</h3>
+        </div>
+      );
+    };
+
+    export default Dashboard;
+    ```
+
+- SWR vercel
+
+  - React hooks for data fetching
+  - It handles catching validation, etc
+  - swr.vercel.app
+  - npm i swr
+  - example:
+
+  ```
+    import React from "react";
+    import useSWR from "swr";
+
+    const fetcher = async () => {
+      const response = await fetch("http://localhost:4000/dashboard");
+      const data = await response.json();
+      return data;
+    };
+
+    const DashboardSwr = () => {
+      const { data, error } = useSWR("dashboard", fetcher);
+      if (error) return "An error has occured";
+      if (!data) return "loading...";
+      return (
+        <div>
+          <h1>Dashboard</h1>
+          <h3>Posts - {data.posts}</h3>
+          <h3>Likes - {data.likes}</h3>
+          <h3>Followers - {data.followers}</h3>
+          <h3>Following - {data.following}</h3>
+        </div>
+      );
+    };
+
+    export default DashboardSwr;
+  ```
+
+- Pre - rendenring + client side data fetching
+
+  - Event listing page
+
+    - A page that show a list of events happening around you
+    - SEO + request time request tie data fetching -> Server side rendering
+    - Client side data fetching for filtering events
+    - We can use shallow routing to set in the url params according to our filters
+
+    ```
+      import React, { useState } from "react";
+      import { useRouter } from "next/router";
+
+      export async function getServerSideProps(context) {
+        const { query } = context;
+        const { category } = query;
+        const queryString = category ? "category=sports" : "";
+        const response = await fetch(`http://localhost:4000/events?${queryString}`);
+        const data = await response.json();
+        return {
+          props: {
+            eventList: data,
+          },
+        };
+      }
+
+      const Events = ({ eventList }) => {
+        const fetchSports = async () => {
+          const response = await fetch(
+            "http://localhost:4000/events?category=sports"
+          );
+          const data = await response.json();
+          setEvents(data);
+          router.push("/events?category=sports", undefined, { shallow: true });
+        };
+        const [events, setEvents] = useState(eventList);
+        const router = useRouter();
+        return (
+          <div>
+            <h1>Events</h1>
+            <button onClick={fetchSports}>Sports</button>
+            {events.map((event) => (
+              <div key={event.id}>
+                <h2>
+                  {event.id} {event.title} {event.date} | {event.category}
+                </h2>
+                <p>{event.description}</p>
+                <hr />
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      export default Events;
+    ```
+
+- API Routes section intro
+
+  - API Routes feature and how to create a basic AI in next
+  - Handle GET and POST requests
+  - Dynamic API routes
+  - Handle DELETE requests
+  - Catch all APIs
+  - Next is a fullstack framework
+  - You can write the FE code in react and also write APIs that can be called by the front end code
+  - API outes allow you to create restful endpoints as part of your next js app folder structure
+  - Within the pages folder , you need to create a folder called `api`
+  - Within that api folder you can define all the APIs for your app
+  - You can add business logic without needing to write any additional custome server code and without having to configure any api routes
+  - Next js ives you everything you need to write full stack react + node apps
+
+- First API services
+
+  - create a folder called api within the pages folder
+  - create an index file inside the api folder and it should export a function called handler with two parameters : request and response
+    ```
+      export default function handler(req, res) {
+          res.status(200).json({name: 'Home API route'});
+      }
+    ```
+  - we can also create folders and files and they will be mapped as urls , similar to pages
+  - ./pages/api/dashboard/index.js (http://localhost:3000/api/dashboard)
+    ```
+        export default function handler(req, res) {
+            res.status(200).json({name: 'Dashboard API route'});
+        }
+    ```
+  - The best thing is that the api folder will never be bundled in the frontend page so the browser cannot download the bundle
+
+- GET request
+
+  - Create a folder called data in the root of the project
+  - Create a file within the data folder
+    ```
+      export const comments = [
+          {
+              id: 1,
+              text: `this is the first comment`
+          },
+          {
+              id: 2,
+              text: `this is the second comment`
+          },
+          {
+              id: 3,
+              text: `this is the third comment`
+          },
+      ]
+    ```
+  - Create a new folder inside the api folder called comments
+  - Create a new file called index inside the comments folder
+
+    ```
+      import { comments } from "../../../data/comments";
+
+      export default function handler(req, res){
+          res.status(200).json(comments)
+      }
+    ```
+
+  - Create a new folder inside the pages folder called comments
+  - Create a new file called index inside the comments folder
+
+  ```
+      import React, { useState } from "react";
+
+      const Comments = () => {
+        const [comments, setComments] = useState([]);
+        const fetchCommnents = async () => {
+          const response = await fetch(`/api/comments`);
+          const data = await response.json();
+          setComments(data);
+        };
+        return (
+          <div>
+            <button onClick={fetchCommnents}>Load comments</button>
+            <hr />
+            {comments.map((comment) => (
+              <div key={comment.id}>{comment.text}</div>
+            ))}
+          </div>
+        );
+      };
+
+      export default Comments;
+  ```
+
+- POST request
+
+  - Create a new button called submit in the frontend page
+
+    ```
+        import React, { useState } from "react";
+        const Comments = () => {
+          const [comments, setComments] = useState([]);
+          const [comment, setComment] = useState(``);
+          const fetchCommnents = async () => {
+            const response = await fetch(`/api/comments`);
+            const data = await response.json();
+            setComments(data);
+          };
+
+          const submitComment = async () => {
+            const response = await fetch(`/api/comments`, {
+              method: "POST",
+              body: JSON.stringify({ comment }),
+              headers: {
+                "Content-Type": "application/json",
+              },
+            });
+            const data = await response.json();
+            console.log({ data });
+          };
+
+          return (
+            <div>
+              <input
+                type="text"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+              />
+              <button onClick={submitComment}>Submit</button>
+              <hr />
+              <button onClick={fetchCommnents}>Load comments</button>
+              <hr />
+              {comments.map((c) => (
+                <div key={c.id}>{c.text}</div>
+              ))}
+            </div>
+          );
+        };
+
+        export default Comments;
+    ```
+
+  - Add a new condition to handle the POST requests
+
+    ```
+      import { comments } from "../../../data/comments";
+
+      export default function handler(req, res) {
+        if (req.method === `GET`) res.status(200).json(comments);
+        else if (req.method === "POST") {
+          const comment = req.body.comment;
+          const newComment = {
+            id: Date.now(),
+            text: comment,
+          };
+          comments.push(newComment);
+          res.status(201).json(newComment);
+        }
+      }
+    ```
+
+- Dynamic API routes
+
+  - For delete a comment you will know the comment id so in the url you should have something like /api/comments/:commentId
+  - So we need to have a dynamic api routes
+  - Similar to pages we can create dynamic routes by adding a new file with squeare brackets [commentId].js
+
+    ```
+      import { comments } from "../../../data/comments";
+
+      export default function handler(req, res) {
+        const { commentId } = req.query;
+        const comment = comments.find(
+          (comment) => comment.id === parseInt(commentId)
+        );
+        res.status(200).json(comment);
+      }
+    ```
+
+- Delete request
+
+  - Add new buttons to the front end to delete the comment
+
+    ```
+      import React, { useState } from "react";
+
+      const Comments = () => {
+        const [comments, setComments] = useState([]);
+        const [comment, setComment] = useState(``);
+
+        const fetchCommnents = async () => {
+          const response = await fetch(`/api/comments`);
+          const data = await response.json();
+          setComments(data);
+        };
+
+        const submitComment = async () => {
+          const response = await fetch(`/api/comments`, {
+            method: "POST",
+            body: JSON.stringify({ comment }),
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+          const data = await response.json();
+          console.log({ data });
+        };
+
+        const deleteComment = async (commentId) => {
+          const response = await fetch(`/api/comments/${commentId}`, {
+            method: "DELETE",
+          });
+          const data = await response.json();
+          console.log({ data });
+          fetchCommnents();
+        };
+
+
+
+        return (
+          <div>
+            <input
+              type="text"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+            />
+            <button onClick={submitComment}>Submit</button>
+            <hr />
+            <button onClick={fetchCommnents}>Load comments</button>
+            <hr />
+            {comments.map((c) => (
+              <div key={c.id}>
+                {c.text} - <button onClick={() => deleteComment(c.id)}>Delete</button>
+              </div>
+            ))}
+          </div>
+        );
+      };
+
+      export default Comments;
+
+    ```
+
+  - Add a new logic in [commentId].js to handle delete method
+
+    ```
+      import { comments } from "../../../data/comments";
+
+        export default function handler(req, res) {
+          const { commentId } = req.query;
+          const comment = comments.find(
+            (comment) => comment.id === parseInt(commentId)
+          );
+          if (req.method == "GET") {
+            res.status(200).json(comment);
+          } else if (req.method == "DELETE") {
+            const index = comments.findIndex((c) => c.id === comment.id);
+            comments.splice(index, 1);
+            res.status(200).json(comment);
+          }
+        }
+    ```
+
+  
