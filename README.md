@@ -1087,4 +1087,25 @@ Why pre-render?
         }
     ```
 
-  
+- Catch all
+  - Sometimes the segments are optional we can get one segment or multiple segments
+  - for example: http://localhost:3000/api/one/two/three/four
+  - so for that we would need to create a new file called [...params].js
+  - in this file we could add
+    ```
+      export default function handler(req, res) {
+        const params = req.query.params;
+        console.log({ params });
+        res.status(200).json(params);
+      }
+    ```
+  - We can get all the params through the variable req.query.params in this file
+
+- APIs and pre rendering
+  - We should not call our own api from pre rendering because it can cause unexpected behavior and the performance can be affected
+
+
+- Styling
+
+
+
