@@ -1,5 +1,5 @@
 import React from "react";
-import comments from "../../data/comments";
+import { comments } from "../../data/comments";
 /*export async function getServerSideProps(context) {
   const {
     params: { commentId },
