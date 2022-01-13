@@ -7,6 +7,11 @@ export async function getServerSideProps(context) {
   const queryString = category ? "category=sports" : "";
   const response = await fetch(`http://localhost:4000/events?${queryString}`);
   const data = await response.json();
+  const user = process.env.DB_USER;
+  const password = process.env.DB_PASSWORD;
+
+  console.log({ user, password });
+
   return {
     props: {
       eventList: data,
