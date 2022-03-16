@@ -1430,6 +1430,7 @@ Why pre-render?
     ```
 
 - Environment variables
+
   - We require environment variables like dev, prod or qa
   - We need to create a new file called .env.local
   - To add variables we would need to add keys and values
@@ -1440,3 +1441,317 @@ Why pre-render?
   - We can get the info by calling process.env.DB_USER
   - They are not exposed in the frontend by default
   - but we can make it public by adding a prefix called NEXT*PUBLIC*\*
+
+- Authentication
+
+  - Intro
+
+    - next-auth library
+    - Authenticating with github
+    - Handle signin sign out an securing the app
+    - How to work with a database with mongodb
+
+    - User :
+      - identitiy who user is
+      - access what permission he has
+    - Autehtnication
+
+      - client side
+      - server side
+      - API routes
+      - Need to persist user data? if not we can use auth services like github, facebook, gmail.
+
+    - Next Auth : Library that offers solutions for authentication
+
+  - Setup
+
+    - Install the packages
+      - npm i next-auth
+    - Create a new folder in the pages/api called auth
+    - Inside the folder create a new file callesd [...nextauth].js
+    - We are going to sign in with GITHub, so before going to the code we ahve to create a new app in the github profile https://github.com/settings/developers
+      - Create a new app with http://localhost:3000 as Homepage URL and callback
+      - We have to copy the client Id and the secret Id
+      - Create a new file called .env.local
+        - Paste the clientId and the secret Id as GITHUB_ID and GITHUB_SECRET
+    - in the [...nextauth].js
+      ```
+        import NextAuth from "next-auth";
+        import GitHub from "next-auth/providers/github";
+        export default NextAuth({
+          // add providers like github , gmail, twitter, facebook
+          providers: [
+            GitHub({
+              clientId: process.env.GITHUB_ID,
+              clientSecret: process.env.GITHUB_SECRET,
+            }),
+          ],
+        });
+      ```
+    - To sing in we have to go to the url http://localhost:3000/api/auth/signin
+      - It creates a new cookie called next-auth.session-token
+    - TO sing out we have to go to http://localhost:3000/api/auth/signout
+
+  - Sign in and sign out
+
+    - We want to navigate using sign in and sign out, in the navbar.js
+
+    ```
+      import { signIn, signOut, useSession } from "next-auth/react";
+
+      function Navbar() {
+
+        return (
+          <nav className="header">
+            <h1 className="logo">
+              <a href="#">NextAuth</a>
+            </h1>
+            <ul className={`main-nav loaded`}>
+              <li>
+                <Link href="/api/auth/signin">
+                  <a
+                    onClick={(e) => {
+                      e.preventDefault();
+                      signIn("github");
+                    }}
+                  >
+                    Sign In
+                  </a>
+                </Link>
+              </li>
+              <li>
+                <Link href="/api/auth/signout">
+                  <a
+                    onClick={(e) => {
+                      e.preventDefault();
+                      signOut();
+                    }}
+                  >
+                    Sign Out
+                  </a>
+                </Link>
+              </li>
+            </ul>
+          </nav>
+        )
+      }
+    ```
+
+  - client side
+
+    - we want to show the buttons according to the session state
+    - before all, we have to wrap the application with the <SessionProvider/> in the \_apps.js file
+    - We have to implement the useSession hook to get:
+      - data which contains an attribute called session
+      - status that is an wnum which cotnains three possible states: "loading" | "authenticated" | "unauthenticated"
+    - To hide buttons accoding to the session in the navbar js we will have to add
+
+      ```
+        import Link from "next/link";
+        import { signIn, signOut, useSession } from "next-auth/react";
+
+        function Navbar() {
+          const { data: session, status } = useSession();
+          console.log({ session, status });
+          return (
+            <nav className="header">
+              <h1 className="logo">
+                <a href="#">NextAuth</a>
+              </h1>
+              <ul className={`main-nav ${status === "loading" ? "loading" : "loaded"}`}>
+
+
+              {status === "unauthenticated" && (
+                <li>
+                  <Link href="/api/auth/signin">
+                    <a
+                      onClick={(e) => {
+                        e.preventDefault();
+                        signIn("github");
+                      }}
+                    >
+                      Sign In
+                    </a>
+                  </Link>
+                </li>
+              )}
+
+              {status === "authenticated" && (
+                <li>
+                  <Link href="/api/auth/signout">
+                    <a
+                      onClick={(e) => {
+                        e.preventDefault();
+                        signOut();
+                      }}
+                    >
+                      Sign Out
+                    </a>
+                  </Link>
+                </li>
+              )}
+            </ul>
+          </nav>
+        );
+      }
+      ```
+
+- Securing pages
+
+  - only logged users can see profile page
+  - in the profile.js
+
+  ```
+      import React, { useEffect, useState } from "react";
+      import { getSession, signIn } from "next-auth/react";
+
+      const Profile = () => {
+        const [loading, setloading] = useState(true);
+
+        useEffect(() => {
+          const securePage = async () => {
+            const session = await getSession();
+            console.log({ session });
+            if (!session) {
+              signIn();
+            } else {
+              setloading(false);
+            }
+          };
+          securePage();
+        }, []);
+        if (loading) return <h3>Loading...</h3>;
+        return <h1>Profile page</h1>;
+      };
+
+      export default Profile;
+
+  ```
+
+- Server side authentication
+
+  - to get session in the server side
+
+  ```
+      import React from "react";
+      import { getSession } from "next-auth/react";
+
+      function Settings({ data }) {
+        return (
+          <div>
+            <h1>Settings page</h1>
+            <h2>{data}</h2>
+          </div>
+        );
+      }
+
+      export default Settings;
+
+      export async function getServerSideProps(context) {
+        const session = await getSession(context);
+        return {
+          props: {
+            data: session ? "Yes session! :D" : "No session! :(",
+            // we can send the session to the pageProps in the _app.js
+            session,
+          },
+        };
+      }
+
+  ```
+
+  - We could set the session in the session provider in \_app.js
+
+    ```
+      function MyApp({ Component, pageProps }) {
+        if (Component.getLayout)
+          return Component.getLayout(<Component {...pageProps} />);
+        return (
+          <SessionProvider session={pageProps.session}>
+            <Head>
+              <title>Code julian</title>
+              <meta name="description" content="Awesome tool" />
+            </Head>
+            <Header />
+
+            <Navbar />
+            <Component {...pageProps} />
+            <Footer />
+          </SessionProvider>
+        );
+      }
+
+    ```
+
+- How to secure pages server side
+
+  - we can also evaluate from the server if the user can access to the current url if not we should redirect
+
+  ```
+    import React from "react";
+    import { getSession } from "next-auth/react";
+
+    function Settings({ data }) {
+      return (
+        <div>
+          <h1>Settings page</h1>
+          <h2>{data}</h2>
+        </div>
+      );
+    }
+
+    export default Settings;
+
+    export async function getServerSideProps(context) {
+      const session = await getSession(context);
+      if (session)
+        return {
+          props: {
+            data: session ? "Yes session! :D" : "No session! :(",
+            // we can send the session to the pageProps in the _app.js
+            session,
+          },
+        };
+      return {
+        redirect: {
+          destination: `/api/auth/signin?callbackUrl=http://localhost:3000/settings`,
+          permanent: false,
+        },
+      };
+    }
+
+  ```
+
+- Securing API routes
+
+  ```
+    import { getSession } from "next-auth/react";
+
+      const handler = async (req, res) => {
+        const session = await getSession({ req });
+        if (!session) res.status(401).json({ error: "Unauthorized user" });
+        else res.status(200).json({ message: "Sucess", session });
+      };
+
+      export default handler;
+  ```
+
+- Connecting to a database
+
+  - Persist user data in the app
+  - in mongodb atlas create a new account and a new cluster
+  - run
+    - npm i mongodb @next-auth/mongodb-adapter
+  - create env variables in .env.local
+    ```
+      DB_USERNAME=xxx
+      DB_PASSWORD=xxx
+      DB_DATABASE=xxx
+      DB_HOST=xxx
+      DB_URL=mongodb+srv://$DB_USERNAME:$DB_PASSWORD@$DB_HOST/$DB_DATABASE?retryWrites=true&w=majority
+    ```
+  - In the pages/api/auth/[...nextauth].js
+
+    ```
+
+    ```

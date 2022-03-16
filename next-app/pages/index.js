@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useSession } from "next-auth/react";
 
 const Home = () => {
   const router = useRouter();
@@ -10,6 +11,9 @@ const Home = () => {
     router.push("/product/1");
     //router.replace("/product/1");
   };
+
+  const { data: session, status } = useSession();
+  console.log({ session, status });
   return (
     <>
       <h1>Home page</h1>
